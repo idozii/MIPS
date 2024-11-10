@@ -3,7 +3,7 @@
 .align 2
 buffer: .space 2048
 temp: .space 64
-num_buffer: .space 64
+number: .space 64
 
 #File names
 input_file: .asciiz "input_matrix.txt"
@@ -47,6 +47,7 @@ error_open: .asciiz "Error opening file\n"
 error_parse: .asciiz "Error parsing file\n"
 error_params: .asciiz "Invalid parameters\n"
 error_params1: .asciiz "Wrong value\n"
+error_size: .asciiz "Error: size not match"
 
 .text
 main:
@@ -314,9 +315,14 @@ finish_parsing:
 do_convolution:
     l.s $f0, N
     l.s $f1, p
-    l.s $f2, M
+    add.s $f20, $f0, $f1  # N + p
+    add.s $f20, $f20, $f1  # N + 2p
+    # Get kernel size (M)
+    l.s $f2, M 
+    # Compare kernel size with padded matrix
+    c.lt.s $f20, $f2      # If padded < kernel
+    bc1t size_error  
     l.s $f3, s
-    
     l.s $f4, float_two   # Load 2.0
     mul.s $f4, $f4, $f1  # 2.0 * p
     add.s $f4, $f0, $f4  # N + 2p
@@ -604,6 +610,12 @@ params_error:
 params_error1:
     li $v0, 4
     la $a0, error_params1
+    syscall
+    j exit
+
+size_error:
+    li $v0, 4
+    la $a0, error_size
     syscall
     j exit
 
