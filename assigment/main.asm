@@ -1,39 +1,52 @@
 .data 
 #Dynamic Allocation
+.align 2
 buffer: .space 2048
+temp: .space 64
+num_buffer: .space 64
 
 #File names
 input_file: .asciiz "input_matrix.txt"
 output_file: .asciiz "output_matrix.txt"
-header: .asciiz "--------RESULT--------\n"
+
 
 #Ouput details
+header: .asciiz "--------RESULT--------\n"
 result: .asciiz "The result is: \n"
 image_msg: .asciiz "Image Matrix:\n"
 kernel_msg: .asciiz "Kernel Matrix:\n"
 output_msg: .asciiz "Output Matrix:\n"
-padding_msg: .asciiz "Padded Matrix:\n"
 space: .asciiz " "
 newline: .asciiz "\n"
 
+# Add float constants
+.align 2
+float_zero: .float 0.0
+float_one: .float 1.0
+float_two: .float 2.0
+float_three: .float 3.0
+float_four: .float 4.0
+float_ten: .float 10.0
+
 #Variables
+.align 2
 N: .float 0.0
 M: .float 0.0
 p: .float 0.0
 s: .float 0.0
-temp: .space 16
 
 #Matrices
+.align 2
 image: .word 0
 kernel: .word 0
 output: .word 0
 padded_image: .word 0
 
-#Errors ha
+#Errors handling
 error_open: .asciiz "Error opening file\n"
 error_parse: .asciiz "Error parsing file\n"
 error_params: .asciiz "Invalid parameters\n"
-padding_error: .asciiz "Invalid padding/stride parameters\n"
+error_params1: .asciiz "Wrong value\n"
 
 .text
 main:
@@ -59,220 +72,242 @@ main:
 
     li $v0, 16
     move $a0, $s0
-    syscall
-
-    li $v0, 9
-    move $a0, $s4
-    addiu $a0, $a0, 4  
-    syscall
-    move $s1, $v0     
+    syscall   
 
     la $s2, buffer
-    move $s3, $s1
     li $t0, 0
 
-parse_first_row:
-    la $s3, temp        
-    li $t0, 0           
+read_params:
+    la $s3, temp      # Reset temp buffer
+    li $t1, 0         # Character counter
 
-read_number:
-    la $s3, temp        
-    li $t1, 0           
-
-get_chars:
-    lb $t2, ($s2)        
-    beq $t2, 32, finish_num  
-    beq $t2, 10, finish_num  
-    beq $t2, 0, finish_num   
+get_param:
+    lb $t2, ($s2)     # Get next char
+    beq $t2, 32, end_param   # Space
+    beq $t2, 10, end_param   # Newline
+    beq $t2, 0, end_param    # Null
     
-    sb $t2, ($s3)        
-    addi $s2, $s2, 1    
-    addi $s3, $s3, 1     
-    addi $t1, $t1, 1     
-    j get_chars
+    sb $t2, ($s3)     # Store in temp
+    addi $s2, $s2, 1
+    addi $s3, $s3, 1
+    addi $t1, $t1, 1
+    j get_param
 
-finish_num:
-    sb $zero, ($s3)      
+end_param:
+    sb $zero, ($s3)   # Null terminate
     jal string_to_float
     
     beq $t0, 0, store_N
     beq $t0, 1, store_M
     beq $t0, 2, store_p
     beq $t0, 3, store_s
-    j parse_error        
+    j parse_error      
 
 string_to_float:
-    la $t3, temp         
-    li $t4, 0          
-    li $t5, 0           
-    li $t6, 10          
-    li $t9, 0           
-    li $s7, 1           
-    
+    # Convert string to float
+    la $t3, temp      # Input string
+    li $t4, 0         # Integer part
+    li $t5, 0         # Decimal flag
+    li $t6, 10        # Base 10
+    li $t9, 0         # Decimal counter
+    li $s7, 1         # Sign
+
+    # Check for negative
     lb $t7, ($t3)
-    li $t8, 45          
-    bne $t7, $t8, str_to_float_loop
-    li $s7, -1          
-    addi $t3, $t3, 1    
+    li $t8, 45        # '-'
+    bne $t7, $t8, convert_loop
+    li $s7, -1
+    addi $t3, $t3, 1
     
-str_to_float_loop:
-    lb $t7, ($t3)      
-    beq $t7, 0, finish_float  
-    beq $t7, 46, decimal_point
+convert_loop:
+    lb $t7, ($t3)
+    beqz $t7, end_convert
+    beq $t7, 46, set_decimal  # '.'
     
-    li $t8, 48          
-    sub $t7, $t7, $t8   
+    addi $t7, $t7, -48  # Convert to number
     
     beq $t5, 1, handle_decimal
-    mul $t4, $t4, 10    
-    add $t4, $t4, $t7   
-    addi $t3, $t3, 1    
-    j str_to_float_loop
-    
-decimal_point:
-    li $t5, 1           
-    addi $t3, $t3, 1    
-    j str_to_float_loop
-    
+    mul $t4, $t4, 10
+    add $t4, $t4, $t7
+    addi $t3, $t3, 1
+    j convert_loop
+
+set_decimal:
+    li $t5, 1
+    addi $t3, $t3, 1
+    j convert_loop
+
 handle_decimal:
-    addi $t9, $t9, 1    
-    beq $t9, 2, finish_float  
-    mul $t4, $t4, 10    
-    add $t4, $t4, $t7   
-    addi $t3, $t3, 1    
-    j str_to_float_loop
-    
-finish_float:
-    mtc1 $t4, $f0      
-    cvt.s.w $f0, $f0   
-    mtc1 $t6, $f2      
-    cvt.s.w $f2, $f2   
-    div.s $f0, $f0, $f2
-    
+    addi $t9, $t9, 1
+    beq $t9, 2, end_convert
+    mul $t4, $t4, 10
+    add $t4, $t4, $t7
+    addi $t3, $t3, 1
+    j convert_loop
+
+end_convert:
+    # Convert to float
+    mtc1 $t4, $f0
+    cvt.s.w $f0, $f0
+    mtc1 $t6, $f2
+    cvt.s.w $f2, $f2
+    div.s $f0, $f0, $f2   # Scale decimal
     mtc1 $s7, $f2
-    cvt.s.w $f2, $f2    
-    mul.s $f0, $f0, $f2
-    
-    jr $ra              
+    cvt.s.w $f2, $f2
+    mul.s $f0, $f0, $f2   # Apply sign
+    jr $ra
 
 store_N:
     s.s $f0, N
-    j next_num
+    cvt.w.s $f0, $f0
+    mfc1 $t1, $f0
+    li $t2, 3        # Min
+    li $t3, 7        # Max
+    blt $t1, $t2, params_error1
+    bgt $t1, $t3, params_error1
+    j next_param
+    
 store_M:
     s.s $f0, M
-    j next_num
+    cvt.w.s $f0, $f0
+    mfc1 $t1, $f0
+    li $t2, 2        # Min
+    li $t3, 4        # Max
+    blt $t1, $t2, params_error1
+    bgt $t1, $t3, params_error1
+    j next_param
+
 store_p:
-    cvt.w.s $f0, $f0    
-    cvt.s.w $f0, $f0    
     s.s $f0, p
-    j next_num
+    l.s $f2, float_zero
+    l.s $f3, float_four
+    c.lt.s $f0, $f2
+    bc1t params_error1
+    c.lt.s $f3, $f0
+    bc1t params_error1
+    j next_param
+    
 store_s:
-    cvt.w.s $f0, $f0    
-    cvt.s.w $f0, $f0    
     s.s $f0, s
+    l.s $f2, float_one
+    l.s $f3, float_three
+    c.lt.s $f0, $f2
+    bc1t params_error1
+    c.lt.s $f3, $f0
+    bc1t params_error1
     j allocate_matrices
 
-next_num:
-    addi $t0, $t0, 1     
-    addi $s2, $s2, 1     
-    j read_number
+next_param:
+    addi $t0, $t0, 1
+    addi $s2, $s2, 1
+    j read_params
 
 allocate_matrices:
+    # Allocate image matrix
     l.s $f0, N
-    cvt.w.s $f0, $f0    
-    mfc1 $t0, $f0        
-    mul $t1, $t0, $t0    
-    sll $t1, $t1, 2      
+    cvt.w.s $f0, $f0
+    mfc1 $t0, $f0
+    mul $t1, $t0, $t0
+    sll $t1, $t1, 2
     
     li $v0, 9
     move $a0, $t1
     syscall
-    sw $v0, image        
+    sw $v0, image
 
+    # Allocate kernel matrix
     l.s $f0, M
-    cvt.w.s $f0, $f0     
-    mfc1 $t0, $f0        
-    mul $t1, $t0, $t0    
-    sll $t1, $t1, 2      
+    cvt.w.s $f0, $f0
+    mfc1 $t0, $f0
+    mul $t1, $t0, $t0
+    sll $t1, $t1, 2
     
     li $v0, 9
     move $a0, $t1
     syscall
-    sw $v0, kernel       
+    sw $v0, kernel
 
-    j parse_matrices      
+    j parse_matrices    
 
 parse_matrices:
+    # Skip newline after parameters
     addi $s2, $s2, 1
-    lw $s3, image        
+
+    # Parse image matrix
+    lw $s3, image
+    beqz $s3, params_error
+    
     l.s $f0, N
     cvt.w.s $f0, $f0
-    mfc1 $s4, $f0        
-    mul $s5, $s4, $s4    
-    li $t0, 0            
+    mfc1 $s4, $f0
+    mul $s5, $s4, $s4
+    li $t0, 0     
 
 parse_image:
-    la $t8, temp         
-    li $t1, 0            
+    beq $t0, $s5, parse_kernel_start
+    la $t8, temp
+    li $t1, 0
 
 get_image_num:
-    lb $t2, ($s2)        
-    beq $t2, 32, end_image_num  
-    beq $t2, 10, end_image_num  
-    beq $t2, 0, end_image_num   
-    
-    sb $t2, ($t8)        
-    addi $s2, $s2, 1     
-    addi $t8, $t8, 1     
-    addi $t1, $t1, 1     
-    j get_image_num
-
-end_image_num:
-    sb $zero, ($t8)      
-    jal string_to_float  
-    
-    s.s $f0, ($s3)       
-    addi $s3, $s3, 4     
-    addi $t0, $t0, 1     
-    addi $s2, $s2, 1     
-    
-    bne $t0, $s5, parse_image  
-
-    addi $s2, $s2, 1
-    lw $s3, kernel       
-    l.s $f0, M
-    cvt.w.s $f0, $f0
-    mfc1 $s4, $f0        
-    mul $s5, $s4, $s4    
-    li $t0, 0            
-
-parse_kernel:
-    la $t8, temp         
-    li $t1, 0            
-
-get_kernel_num:
     lb $t2, ($s2)
-    beq $t2, 32, end_kernel_num
-    beq $t2, 10, end_kernel_num
-    beq $t2, 0, end_kernel_num
+    beq $t2, 32, end_image_num
+    beq $t2, 10, end_image_num
+    beq $t2, 0, end_image_num
     
     sb $t2, ($t8)
     addi $s2, $s2, 1
     addi $t8, $t8, 1
     addi $t1, $t1, 1
-    j get_kernel_num
+    j get_image_num
 
-end_kernel_num:
+end_image_num:
     sb $zero, ($t8)
     jal string_to_float
-    
     s.s $f0, ($s3)
     addi $s3, $s3, 4
     addi $t0, $t0, 1
     addi $s2, $s2, 1
-    
-    bne $t0, $s5, parse_kernel
+    j parse_image         
 
+parse_kernel_start:
+    lw $s3, kernel      # Load kernel address
+    beqz $s3, params_error
+    l.s $f0, M
+    cvt.w.s $f0, $f0
+    mfc1 $s4, $f0       # s4 = 3 (for 3x3)
+    mul $s5, $s4, $s4   # s5 = 9 elements
+    li $t0, 0              # Element counter
+
+parse_kernel:
+    beq $t0, $s5, finish_parsing
+    la $t8, temp
+    li $t1, 0
+
+get_kernel_num:
+    lb $t2, ($s2)
+    beq $t2, 32, end_kernel_num   # Space
+    beq $t2, 10, end_kernel_num   # Newline
+    beq $t2, 0, end_kernel_num    # Null
+    
+    # Store character
+    sb $t2, ($t8)
+    addi $t8, $t8, 1
+    addi $s2, $s2, 1
+    addi $t1, $t1, 1
+    j get_kernel_num
+
+end_kernel_num:
+    sb $zero, ($t8)     # Null terminate
+    jal string_to_float # Convert to float
+    s.s $f0, ($s3)      # Store in kernel matrix
+    addi $s3, $s3, 4    # Next kernel position
+    addi $t0, $t0, 1    # Increment element counter
+
+    # Skip whitespace
+    addi $s2, $s2, 1    # Next char
+    j parse_kernel 
+
+finish_parsing:
     jal do_convolution
     j print_all_matrices
 
@@ -282,13 +317,14 @@ do_convolution:
     l.s $f2, M
     l.s $f3, s
     
-    li.s $f4, 2.0
-    mul.s $f4, $f4, $f1
-    add.s $f4, $f0, $f4
-    sub.s $f4, $f4, $f2
-    div.s $f4, $f4, $f3
-    li.s $f5, 1.0
-    add.s $f4, $f4, $f5
+    l.s $f4, float_two   # Load 2.0
+    mul.s $f4, $f4, $f1  # 2.0 * p
+    add.s $f4, $f0, $f4  # N + 2p
+    sub.s $f4, $f4, $f2  # (N + 2p) - M
+    div.s $f4, $f4, $f3  # ((N + 2p) - M) / s
+    
+    l.s $f5, float_one   # Load 1.0
+    add.s $f4, $f4, $f5  # + 1.0
     
     cvt.w.s $f4, $f4
     mfc1 $s0, $f4
@@ -429,6 +465,23 @@ ker_col:
     
     jr $ra
 
+round_for_print:
+    l.s $f2, float_ten   # Load 10.0
+    mul.s $f14, $f12, $f2
+    abs.s $f14, $f14
+    cvt.w.s $f14, $f14
+    cvt.s.w $f14, $f14
+    div.s $f14, $f14, $f2
+    
+    l.s $f2, float_zero  # Load 0.0
+    c.lt.s $f12, $f2
+    bc1f done
+    neg.s $f14, $f14
+
+done:
+    mov.s $f12, $f14     # Copy result
+    jr $ra
+
 print_all_matrices:
     li $v0, 4
     la $a0, header
@@ -443,10 +496,12 @@ print_all_matrices:
     cvt.w.s $f0, $f0
     mfc1 $s4, $f0
     li $t0, 0
+    
 print_image:
     li $t1, 0
 print_image_element:
     l.s $f12, ($s3)
+    jal round_for_print
     li $v0, 2
     syscall
     
@@ -478,6 +533,7 @@ print_kernel:
     li $t1, 0
 print_kernel_element:
     l.s $f12, ($s3)
+    jal round_for_print
     li $v0, 2
     syscall
     
@@ -506,6 +562,7 @@ print_output:
     move $t1, $zero
 print_output_element:
     l.s $f12, ($s3)
+    jal round_for_print
     li $v0, 2
     syscall
     
@@ -544,6 +601,12 @@ params_error:
     syscall
     j exit
 
-exit:
+params_error1:
+    li $v0, 4
+    la $a0, error_params1
+    syscall
+    j exit
+
+exit:    
     li $v0, 10
     syscall
