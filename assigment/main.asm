@@ -46,7 +46,14 @@ padded_image: .word 0
 error_open: .asciiz "Error opening file\n"
 error_parse: .asciiz "Error parsing file\n"
 error_params: .asciiz "Invalid parameters\n"
-error_params1: .asciiz "Wrong value\n"
+error_params1: .asciiz "Wrong value (image size<3)\n"
+error_params2: .asciiz "Wrong value (image size>7)\n"
+error_params3: .asciiz "Wrong value (kernel size<2)\n"
+error_params4: .asciiz "Wrong value (kernel size>4)\n"
+error_params5: .asciiz "Wrong value (p<0)\n"
+error_params6: .asciiz "Wrong value (p>4)\n"
+error_params7: .asciiz "Wrong value (s<1)\n"
+error_params8: .asciiz "Wrong value (s>3)\n"
 error_size: .asciiz "Error: size not match"
 
 .text
@@ -165,7 +172,7 @@ store_N:
     li $t2, 3        # Min
     li $t3, 7        # Max
     blt $t1, $t2, params_error1
-    bgt $t1, $t3, params_error1
+    bgt $t1, $t3, params_error2
     j next_param
     
 store_M:
@@ -174,8 +181,8 @@ store_M:
     mfc1 $t1, $f0
     li $t2, 2        # Min
     li $t3, 4        # Max
-    blt $t1, $t2, params_error1
-    bgt $t1, $t3, params_error1
+    blt $t1, $t2, params_error3
+    bgt $t1, $t3, params_error4
     j next_param
 
 store_p:
@@ -183,9 +190,9 @@ store_p:
     l.s $f2, float_zero
     l.s $f3, float_four
     c.lt.s $f0, $f2
-    bc1t params_error1
+    bc1t params_error5
     c.lt.s $f3, $f0
-    bc1t params_error1
+    bc1t params_error6
     j next_param
     
 store_s:
@@ -193,9 +200,9 @@ store_s:
     l.s $f2, float_one
     l.s $f3, float_three
     c.lt.s $f0, $f2
-    bc1t params_error1
+    bc1t params_error7
     c.lt.s $f3, $f0
-    bc1t params_error1
+    bc1t params_error8
     j allocate_matrices
 
 next_param:
@@ -654,6 +661,48 @@ params_error:
 params_error1:
     li $v0, 4
     la $a0, error_params1
+    syscall
+    j exit
+
+params_error2:
+    li $v0, 4
+    la $a0, error_params2
+    syscall
+    j exit
+
+params_error3:  
+    li $v0, 4
+    la $a0, error_params3
+    syscall
+    j exit
+
+params_error4:
+    li $v0, 4
+    la $a0, error_params4
+    syscall
+    j exit
+
+params_error5:
+    li $v0, 4
+    la $a0, error_params5
+    syscall
+    j exit
+
+params_error6:
+    li $v0, 4
+    la $a0, error_params6
+    syscall
+    j exit
+
+params_error7:
+    li $v0, 4
+    la $a0, error_params7
+    syscall
+    j exit
+
+params_error8:
+    li $v0, 4
+    la $a0, error_params8
     syscall
     j exit
 

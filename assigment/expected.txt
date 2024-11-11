@@ -66,6 +66,6 @@ Input:
 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0
 
 Expected:
-Wrong value (kernel size <= 4)
+Wrong value (kernel size>4)
 
 //!TC7:
