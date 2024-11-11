@@ -488,6 +488,8 @@ window_sum:
     addi $s1, $s1, 4     # Next element
     addi $t7, $t7, -1    
     bnez $t7, window_sum
+
+    mul.s $f12, $f12, $f5  # Multiply sum by kernel value (1.9)
     
     and $t2, $t2, $s6    
     s.s $f12, ($t2)      # Store result (should be 17.1)
