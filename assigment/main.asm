@@ -495,31 +495,41 @@ window_sum:
     jr $ra
 
 round_for_print:
-    l.s $f2, float_ten   # Load 10.0
-    mul.s $f14, $f12, $f2  # 17.0998 * 10 = 170.998
+    # Reset sign flag first
+    li $t7, 0             # Initialize sign flag to positive
     
-    # Add 0.5 for proper rounding
+    # Check if negative
+    l.s $f2, float_zero
+    c.lt.s $f12, $f2      # Test if negative
+    bc1f do_round         # If positive, continue
+    neg.s $f12, $f12      # Make positive
+    li $t7, 1             # Flag that number was negative
+    j do_round
+    
+do_round:
+    # Round positive number
+    l.s $f2, float_ten    
+    mul.s $f14, $f12, $f2  # Multiply by 10
+    
+    # Add 0.5 and truncate
     l.s $f3, float_one
     l.s $f4, float_two
-    div.s $f3, $f3, $f4   # 0.5
-    add.s $f14, $f14, $f3  # 170.998 + 0.5 = 171.498
+    div.s $f3, $f3, $f4    # Get 0.5
+    add.s $f14, $f14, $f3  # Add for rounding
     
-    # Convert to integer (truncates to 171)
-    abs.s $f14, $f14
-    cvt.w.s $f14, $f14    
-    cvt.s.w $f14, $f14
+    # Convert to int and back
+    cvt.w.s $f14, $f14     # To integer
+    cvt.s.w $f14, $f14     # Back to float
     
-    # Divide by 10 to get final result (17.1)
-    div.s $f14, $f14, $f2
+    # Convert back to one decimal
+    div.s $f14, $f14, $f2  # Divide by 10
     
-    # Handle negative numbers
-    l.s $f2, float_zero
-    c.lt.s $f12, $f2
-    bc1f done
-    neg.s $f14, $f14
+    # Restore sign if needed
+    beqz $t7, done         # If was positive
+    neg.s $f14, $f14       # Restore negative
 
 done:
-    mov.s $f12, $f14
+    mov.s $f12, $f14       # Return result
     jr $ra
 
 print_all_matrices:
@@ -620,168 +630,6 @@ print_output_element:
     
     addi $t0, $t0, 1
     blt $t0, $s0, print_output
-
-write_to_file:
-    # Open output file
-    li $v0, 13
-    la $a0, output_file
-    li $a1, 1           # Write mode
-    li $a2, 0
-    syscall
-    bltz $v0, file_error
-    move $s0, $v0       # Save file descriptor
-
-    # Write header
-    li $v0, 15
-    move $a0, $s0
-    la $a1, header
-    li $a2, 21         # Length of header
-    syscall
-
-    # Write and print image matrix
-    li $v0, 15
-    move $a0, $s0
-    la $a1, image_msg
-    li $a2, 13         # Length of message
-    syscall
-
-    lw $s3, image
-    l.s $f0, N
-    cvt.w.s $f0, $f0
-    mfc1 $s4, $f0      # N size
-    li $t0, 0
-
-write_image:
-    li $t1, 0
-write_image_element:
-    l.s $f12, ($s3)
-    jal round_for_print
-    
-    # Convert float to string in buffer
-    la $a1, temp       # Use temp buffer
-    mov.s $f0, $f12
-    
-    # Write to file
-    li $v0, 15
-    move $a0, $s0 
-    syscall
-
-    # Write space
-    li $v0, 15
-    move $a0, $s0
-    la $a1, space
-    li $a2, 1
-    syscall
-
-    addi $s3, $s3, 4
-    addi $t1, $t1, 1
-    blt $t1, $s4, write_image_element
-
-    # Write newline
-    li $v0, 15
-    move $a0, $s0
-    la $a1, newline
-    li $a2, 1
-    syscall
-
-    addi $t0, $t0, 1
-    blt $t0, $s4, write_image
-
-    # Write kernel matrix header
-    li $v0, 15
-    move $a0, $s0
-    la $a1, kernel_msg
-    li $a2, 13
-    syscall
-
-    lw $s3, kernel
-    l.s $f0, M
-    cvt.w.s $f0, $f0
-    mfc1 $s4, $f0
-    li $t0, 0
-
-write_kernel:
-    li $t1, 0
-write_kernel_element:
-    l.s $f12, ($s3)
-    jal round_for_print
-    
-    # Convert and write kernel value
-    la $a1, temp
-    mov.s $f0, $f12
-    li $v0, 15
-    move $a0, $s0
-    syscall
-
-    # Write space
-    li $v0, 15
-    move $a0, $s0
-    la $a1, space
-    li $a2, 1
-    syscall
-
-    addi $s3, $s3, 4
-    addi $t1, $t1, 1
-    blt $t1, $s4, write_kernel_element
-
-    # Write newline
-    li $v0, 15
-    move $a0, $s0
-    la $a1, newline
-    li $a2, 1
-    syscall
-
-    addi $t0, $t0, 1
-    blt $t0, $s4, write_kernel
-
-    # Write output matrix header
-    li $v0, 15
-    move $a0, $s0
-    la $a1, output_msg
-    li $a2, 13
-    syscall
-
-    lw $s3, output
-    move $t0, $zero
-
-write_output:
-    move $t1, $zero
-write_output_element:
-    l.s $f12, ($s3)
-    jal round_for_print
-    
-    # Convert and write output value
-    la $a1, temp
-    mov.s $f0, $f12
-    li $v0, 15
-    move $a0, $s0
-    syscall
-
-    # Write space
-    li $v0, 15
-    move $a0, $s0
-    la $a1, space
-    li $a2, 1
-    syscall
-
-    addi $s3, $s3, 4
-    addi $t1, $t1, 1
-    blt $t1, $s0, write_output_element
-
-    # Write newline
-    li $v0, 15
-    move $a0, $s0
-    la $a1, newline
-    li $a2, 1
-    syscall
-
-    addi $t0, $t0, 1
-    blt $t0, $s0, write_output
-
-    # Close file
-    li $v0, 16
-    move $a0, $s0
-    syscall
 
     j exit
 
