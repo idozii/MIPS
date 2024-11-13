@@ -12,7 +12,6 @@ output_file: .asciiz "output_matrix.txt"
 
 #Ouput details
 header: .asciiz "--------RESULT--------\n"
-result: .asciiz "The result is: \n"
 image_msg: .asciiz "Image Matrix:\n"
 kernel_msg: .asciiz "Kernel Matrix:\n"
 padded_msg: .asciiz "Padded Matrix:\n"
@@ -749,169 +748,15 @@ next_row:
     j print_output_row
 
 end_print_output:
-    jal write_output_to_file
     j exit
 
-write_output_to_file:
-    # Open the output file for writing
-    li $v0, 13             # Syscall for open file
-    la $a0, output_file    # File name
-    li $a1, 577            # Flags: O_WRONLY | O_CREAT | O_TRUNC (0x241)
-    li $a2, 438            # Mode: 0666 (in octal)
-    syscall
-    bltz $v0, file_write_error   # Check for errors
-    move $s5, $v0          # File descriptor
-    
-    # Write header "--------RESULT--------\n"
-    li $v0, 15             # Syscall for write
-    move $a0, $s5          # File descriptor
-    la $a1, header         # Header string
-    li $a2, 21             # Length of header
-    syscall
-    
-    # Write "Output Matrix:\n"
-    li $v0, 15
-    move $a0, $s5
-    la $a1, output_msg
-    li $a2, 14             # Length of output_msg
-    syscall
-    
-    # Load output matrix address and size
-    lw $s3, output          # $s3 = address of output matrix
-    lw $t9, output_size     # $t9 = output size
-    li $t0, 0               # Row counter
-    
-write_output_file_row_loop:
-    bge $t0, $t9, close_output_file   # If t0 >= output_size, end loop
-    li $t1, 0               # Column counter
-    
-write_output_file_col_loop:
-    bge $t1, $t9, write_output_file_newline   # If t1 >= output_size, go to next row
-    
-    # Load output value
-    l.s $f12, ($s3)
-    jal float_to_string   
-
-# Write the float string to the file
-    li $v0, 15              # Syscall for write
-    move $a0, $s5           # File descriptor
-    la $a1, temp            # Buffer containing the string
-    lw $a2, temp_length     # Length of the string
-    syscall
-    bltz $v0, file_write_error  # Check for write error
-    
-    # Write a space
-    li $v0, 15
-    move $a0, $s5
-    la $a1, space
-    li $a2, 1
-    syscall
-    bltz $v0, file_write_error
-    
-    addi $s3, $s3, 4        # Next element
-    addi $t1, $t1, 1
-    j write_output_file_col_loop
-    
-write_output_file_newline:
-    # Write a newline character
-    li $v0, 15
-    move $a0, $s5
-    la $a1, newline
-    li $a2, 1
-    syscall
-    bltz $v0, file_write_error
-    
-    addi $t0, $t0, 1        # Increment row counter
-    j write_output_file_row_loop
-    
-close_output_file:
-    # Close the output file
-    li $v0, 16              # Syscall for close
-    move $a0, $s5
-    syscall
-    jr $ra
 
 file_write_error:
     li $v0, 4
-    la $a0, error_write      # Error message for write failure
+    la $a0, error_write
     syscall
-    jr $ra
-
-float_to_string:
-    # Convert float in $f12 to string in 'temp'
-    jal round_for_print     # Round float to one decimal
+    j exit
     
-    # Move rounded float to integer for conversion
-    cvt.w.s $f12, $f12
-    mfc1 $t0, $f12          # Move integer part to $t0
-    
-    # Convert integer to string
-    la $a0, temp            # Destination buffer
-    move $a1, $t0           # Integer to convert
-    jal int_to_string       # Convert integer to string, length in $v0
-    
-    # Store the length
-    sw $v0, temp_length
-    jr $ra
-    
-#-----------------------------------
-# Integer to String Conversion
-#-----------------------------------
-int_to_string:
-    # $a0 = destination buffer
-    # $a1 = integer to convert
-    # Returns length in $v0
-    li $t3, 0               # Length counter
-    move $t4, $a1           # Copy integer to $t4
-    
-    bltz $t4, int_negative  # Check if negative
-    beqz $t4, int_zero
-    
-int_positive:
-    li $t5, 10
-    
-int_pos_loop:
-    div $t4, $t5
-    mfhi $t6
-    mflo $t4
-    addi $t6, $t6, 48       # Convert digit to ASCII
-    sb $t6, 0($a0)
-    addi $a0, $a0, 1
-    addi $t3, $t3, 1
-    bnez $t4, int_pos_loop
-    
-    sub $a0, $a0, $t3       # Reset pointer to start
-    move $v0, $t3           # Return length
-    jr $ra
-    
-int_negative:
-    neg $t4, $t4            # Make positive
-    li $t5, 10
-    li $t7, 45              # ASCII '-'
-    sb $t7, 0($a0)
-    addi $a0, $a0, 1
-    addi $t3, $t3, 1
-    
-int_neg_loop:
-    div $t4, $t5
-    mfhi $t6
-    mflo $t4
-    addi $t6, $t6, 48
-    sb $t6, 0($a0)
-    addi $a0, $a0, 1
-    addi $t3, $t3, 1
-    bnez $t4, int_neg_loop
-    
-    sub $a0, $a0, $t3       # Reset pointer
-    move $v0, $t3           # Return length
-    jr $ra
-    
-int_zero:
-    li $t6, 48
-    sb $t6, 0($a0)
-    li $v0, 1
-    jr $ra
-
 file_error:
     li $v0, 4
     la $a0, error_open
