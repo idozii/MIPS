@@ -5,6 +5,7 @@ buffer: .space 2048
 temp: .space 64
 number: .space 64
 temp_length: .word 0
+temp_int: .space 16                       # Temporary buffer for integer digits
 
 #File names
 input_file: .asciiz "input_matrix.txt"
@@ -22,12 +23,15 @@ newline: .asciiz "\n"
 # Add float constants
 .align 2
 float_zero: .float 0.0
+float_half:   .float 0.5                    
 float_one: .float 1.0
 float_two: .float 2.0
 float_three: .float 3.0
 float_four: .float 4.0
 float_five: .float 5.0
 float_ten: .float 10.0
+float_hundred: .float 100.0
+float_epsilon: .float 1.0e-6  # Small value to compare against
 
 #Variables
 .align 2
@@ -343,14 +347,7 @@ continue_check:
     l.s $f1, float_zero
     c.eq.s $f0, $f1
     bc1t no_padding     # If p=0, skip padding
-
-    # Calculate padding size = (M-1)/2
-    l.s $f0, M           
-    l.s $f2, float_one   
-    sub.s $f0, $f0, $f2  
-    l.s $f2, float_two   
-    div.s $f0, $f0, $f2  
-    
+  
     j setup_padding
 
 no_padding:
@@ -584,12 +581,28 @@ do_round:
     
     div.s $f14, $f14, $f2  # Divide by 10
     
-    beqz $t7, done         # If was positive
+    # Check for small values close to zero
+    abs.s $f16, $f14       # Absolute value
+    l.s $f17, float_epsilon
+    c.lt.s $f16, $f17      # Compare with epsilon
+    bc1f check_sign        # If not close to zero, proceed
+    l.s $f14, float_zero   # Set to zero
+
+check_sign:
+    beqz $t7, done         # If was positive, skip restoring sign
     neg.s $f14, $f14       # Restore negative
 
 done:
-    mov.s $f12, $f14       # Return result
-    jr $ra
+    # Ensure zero is positive
+    abs.s $f16, $f14       # Get the absolute value
+    l.s $f2, float_zero
+    c.eq.s $f16, $f2       # Compare with 0.0
+    bc1f set_result        # If not zero, proceed
+    mov.s $f14, $f2       # Set to positive zero if it is zero
+
+set_result:
+    mov.s $f12, $f14       # Move the result to $f12
+    jr $ra 
 
 print_all_matrices:
     li $v0, 4
@@ -748,8 +761,185 @@ next_row:
     j print_output_row
 
 end_print_output:
+    j write_output
+
+write_output:
+    # Open the output file for writing
+    li $v0, 13                   # SYS_OPEN
+    la $a0, output_file          # File name
+    li $a1, 1                    # Write-only mode
+    li $a2, 0                    # No flags
+    syscall
+    bltz $v0, file_error         # Check for error
+    move $t8, $v0                # Use $t8 for file descriptor
+
+    # Write header to the file
+    la $a0, header               # Buffer address
+    jal write_string_to_file
+
+    # Write Output Matrix label
+    la $a0, output_msg           # "Output Matrix:\n"
+    jal write_string_to_file
+
+    # Load output matrix information
+    lw $s3, output               # $s3 = output matrix base address
+    lw $t9, output_size          # $t9 = output matrix size
+
+    move $t2, $s3                # $t2 = traversal pointer
+    li $t0, 0                    # Row counter
+
+write_output_row:
+    bge $t0, $t9, end_write_output
+    li $t1, 0                    # Column counter
+
+write_output_element:
+    bge $t1, $t9, write_newline
+
+    l.s $f12, 0($t2)             # Load output value
+    jal float_to_string          # Convert float to string
+
+    # Write the string to file
+    la $a0, number               # Buffer containing the string
+    jal write_string_to_file
+
+    # Write space
+    la $a0, space
+    jal write_string_to_file
+
+    addi $t2, $t2, 4             # Next element address
+    addi $t1, $t1, 1             # Increment column index
+    j write_output_element
+
+write_newline:
+    # Write newline character
+    la $a0, newline
+    jal write_string_to_file
+
+    addi $t0, $t0, 1             # Increment row index
+    j write_output_row
+
+end_write_output:
+    # Close the output file
+    li $v0, 16                   # SYS_CLOSE
+    move $a0, $t8                # File descriptor in $t8
+    syscall
+
     j exit
 
+write_string_to_file:
+    # Save the buffer address and file descriptor
+    move $t0, $a0                # $t0 = buffer address (from $a0)
+    move $t1, $t8                # $t1 = file descriptor (from $t8)
+
+    # Initialize traversal pointer
+    move $t2, $t0                # $t2 = traversal pointer
+
+write_string_loop:
+    lb $t3, ($t2)                # Load byte from buffer
+    beqz $t3, write_string_done  # If null terminator, end loop
+    addi $t2, $t2, 1             # Move to next byte
+    j write_string_loop
+
+write_string_done:
+    subu $a2, $t2, $t0           # Calculate length: length = end - start
+    move $a0, $t1                # $a0 = file descriptor
+    move $a1, $t0                # $a1 = buffer address
+    li $v0, 15                   # SYS_WRITE
+    syscall
+    jr $ra
+
+# Subroutine to convert a float in $f12 to a string stored at 'number'
+float_to_string:
+    # Round the float to one decimal place
+    li $t7, 0              # Sign flag
+
+    l.s $f2, float_zero
+    c.lt.s $f12, $f2       # Test if negative
+    bc1f float_positive    # If positive, continue
+    neg.s $f12, $f12       # Make positive
+    li $t7, 1              # Flag that number was negative
+
+float_positive:
+    l.s $f2, float_ten    
+    mul.s $f14, $f12, $f2  # Multiply by 10
+
+    l.s $f3, float_one
+    l.s $f4, float_two
+    div.s $f3, $f3, $f4    # Get 0.5
+    add.s $f14, $f14, $f3  # Add for rounding
+
+    cvt.w.s $f14, $f14     # To integer
+
+    # Extract integer and decimal parts
+    mfc1 $t1, $f14         # $t1 = integer value (float * 10 rounded)
+    div $t2, $t1, 10       # $t2 = integer part
+    mflo $t2
+    rem $t3, $t1, 10       # $t3 = decimal part
+    mfhi $t3
+
+    # Convert integer part to string
+    la $a0, temp_int       # Temporary buffer
+    li $t4, 0              # Digit counter
+
+convert_int_part:
+    bnez $t2, int_loop     # If $t2 != 0, proceed to loop
+    j check_zero_int
+
+int_loop:
+    div $t5, $t2, 10       # Divide by 10
+    mflo $t5
+    rem $t6, $t2, 10       # Remainder
+    mfhi $t6
+    addi $t6, $t6, 48      # Convert to ASCII
+    sb $t6, ($a0)
+    addi $a0, $a0, 1
+    addi $t4, $t4, 1
+    move $t2, $t5
+    bnez $t2, int_loop     # Loop if $t2 != 0
+
+    j reverse_int_string
+
+check_zero_int:
+    li $t6, 48             # '0'
+    sb $t6, ($a0)
+    addi $a0, $a0, 1
+    addi $t4, $t4, 1
+    j reverse_int_string
+
+reverse_int_string:
+    # Reverse the integer string
+    la $a0, temp_int
+    add $a0, $a0, $t4      # Point to end
+    sub $a0, $a0, 1        # Adjust for index
+    la $a1, number         # Destination buffer
+    beqz $t7, store_int    # If positive, skip storing '-'
+    li $t6, 45             # '-'
+    sb $t6, ($a1)
+    addi $a1, $a1, 1
+
+store_int:
+    move $t5, $t4
+copy_int_digits:
+    lb $t6, ($a0)
+    sb $t6, ($a1)
+    addi $a0, $a0, -1
+    addi $a1, $a1, 1
+    addi $t5, $t5, -1
+    bgtz $t5, copy_int_digits
+
+    # Add decimal point
+    li $t6, 46             # '.'
+    sb $t6, ($a1)
+    addi $a1, $a1, 1
+
+    # Convert decimal part
+    addi $t3, $t3, 48      # Convert to ASCII
+    sb $t3, ($a1)
+    addi $a1, $a1, 1
+
+    # Null terminate
+    sb $zero, ($a1)
+    jr $ra
 
 file_write_error:
     li $v0, 4
