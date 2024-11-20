@@ -740,12 +740,8 @@ write_output:
     move $s4, $s3
     li $s5, 0
 
-write_output_row:
-    bge $s5, $t9, end_write_output
-    li $s6, 0
-
 write_output_element:
-    bge $s6, $t9, write_newline
+    bge $s5, $t9, end_write_output
 
     l.s $f12, 0($s4)
     jal float_to_string
@@ -753,19 +749,14 @@ write_output_element:
     la $a0, number
     jal write_string_to_file
 
+    addi $s4, $s4, 4
+    addi $s5, $s5, 1
+
+    bge $s5, $t9, write_output_element
     la $a0, space
     jal write_string_to_file
-
-    addi $s4, $s4, 4
-    addi $s6, $s6, 1
+    
     j write_output_element
-
-write_newline:
-    la $a0, newline
-    jal write_string_to_file
-
-    addi $s5, $s5, 1
-    j write_output_row
 
 end_write_output:
     li $v0, 16
