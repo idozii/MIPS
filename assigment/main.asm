@@ -880,81 +880,289 @@ copy_int_digits:
     jr $ra
 
 file_write_error:
-    li $v0, 4
-    la $a0, error_write
+    li $v0, 4             
+    la $a0, error_write 
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_write
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 file_error:
-    li $v0, 4
-    la $a0, error_open
+    li $v0, 4             
+    la $a0, error_open   
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_open
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 parse_error:
-    li $v0, 4
-    la $a0, error_parse
+    li $v0, 4             
+    la $a0, error_parse 
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_parse
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 params_error:
-    li $v0, 4
-    la $a0, error_params
+    li $v0, 4             
+    la $a0, error_params   
     syscall
+
+    li $v0, 13        
+    la $a0, output_file 
+    li $a1, 1           
+    li $a2, 0          
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0       
+
+    la $a0, error_params
+    jal write_string_to_file
+
+    li $v0, 16         
+    move $a0, $t8
+    syscall
+
     j exit
 
 params_error1:
-    li $v0, 4
-    la $a0, error_params1
+    li $v0, 4             
+    la $a0, error_params1 
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_params1
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 params_error2:
-    li $v0, 4
-    la $a0, error_params2
+    li $v0, 4             
+    la $a0, error_params2 
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_params2
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 params_error3:
-    li $v0, 4
-    la $a0, error_params3
+    li $v0, 4             
+    la $a0, error_params3  
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_params3
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 params_error4:
-    li $v0, 4
-    la $a0, error_params4
+    li $v0, 4             
+    la $a0, error_params4   
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_params4
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 params_error5:
-    li $v0, 4
-    la $a0, error_params5
+    li $v0, 4             
+    la $a0, error_params5  
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_params5
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 params_error6:
-    li $v0, 4
-    la $a0, error_params6
+    li $v0, 4             
+    la $a0, error_params6  
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_params6
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 params_error7:
-    li $v0, 4
-    la $a0, error_params7
+    li $v0, 4             
+    la $a0, error_params7  
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_params7
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 params_error8:
-    li $v0, 4
-    la $a0, error_params8
+    li $v0, 4             
+    la $a0, error_params8   
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_params8
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 size_error:
-    li $v0, 4
-    la $a0, error_size
+    li $v0, 4             
+    la $a0, error_size  
     syscall
+
+    li $v0, 13
+    la $a0, output_file
+    li $a1, 1
+    li $a2, 0
+    syscall
+    bltz $v0, file_error
+    move $t8, $v0
+
+    la $a0, error_size
+    jal write_string_to_file
+
+    li $v0, 16
+    move $a0, $t8
+    syscall
+
     j exit
 
 exit:
