@@ -728,12 +728,6 @@ write_output:
     bltz $v0, file_error
     move $t8, $v0
 
-    la $a0, header
-    jal write_string_to_file
-
-    la $a0, output_msg
-    jal write_string_to_file
-
     lw $s3, output
     lw $t9, output_size
 
@@ -755,7 +749,7 @@ write_output_element:
     bge $s5, $t9, write_output_element
     la $a0, space
     jal write_string_to_file
-    
+
     j write_output_element
 
 end_write_output:
