@@ -730,6 +730,7 @@ write_output:
 
     lw $s3, output
     lw $t9, output_size
+    mul $t9, $t9, $t9
 
     move $s4, $s3
     li $s5, 0
